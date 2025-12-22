@@ -59,6 +59,16 @@
 </section>
 
 <section>
+    <h2>Transfer</h2>
+    <input id="fromWallet" placeholder="From Wallet ID" />
+    <input id="toWallet" placeholder="To Wallet ID" />
+    <input id="transferCurrency" placeholder="Currency (USDx)" />
+    <input id="transferAmount" type="number" placeholder="Amount" />
+    <button onclick="transfer()">Transfer</button>
+    <pre id="transferResult"></pre>
+</section>
+
+<section>
     <h2>View Wallet</h2>
     <input id="viewWalletId" placeholder="Wallet ID" />
     <button onclick="viewWallet()">View</button>
@@ -105,6 +115,23 @@
         });
 
         document.getElementById("swapResult").textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function transfer() {
+        const body = {
+            from_wallet: document.getElementById("fromWallet").value,
+            to_wallet: document.getElementById("toWallet").value,
+            currency: document.getElementById("transferCurrency").value,
+            amount: Number(document.getElementById("transferAmount").value)
+        };
+
+        const res = await fetch(`${API_BASE}/transfer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        document.getElementById("transferResult").textContent = JSON.stringify(await res.json(), null, 2);
     }
 
     async function viewWallet() {
