@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Wallet Demo</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+
+        }
+        section {
+            border: 1px solid #ccc;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        input {
+            display: block;
+            margin-bottom: 8px;
+        }
+        button {
+            margin-top: 8px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<h1>Wallet Frontend (Borderless)</h1>
+
+<section>
+    <h2>Create Wallet</h2>
+    <button onclick="createWallet()">Create Wallet</button>
+    <pre id="walletResult"></pre>
+</section>
+
+<section>
+    <h2>Deposit</h2>
+    <input id="depositWalletId" placeholder="Wallet ID" />
+    <input id="depositCurrency" placeholder="Currency (USDx)" />
+    <input id="depositAmount" type="number" placeholder="Amount" />
+    <button onclick="deposit()">Deposit</button>
+    <pre id="depositResult"></pre>
+</section>
+
+<section>
+    <h2>Swap</h2>
+    <input id="swapWalletId" placeholder="Wallet ID" />
+    <input id="fromCurrency" placeholder="From (USDx)" />
+    <input id="toCurrency" placeholder="To (cNGN)" />
+    <input id="swapAmount" type="number" placeholder="Amount" />
+    <button onclick="swap()">Swap</button>
+    <pre id="swapResult"></pre>
+</section>
+
+<section>
+    <h2>View Wallet</h2>
+    <input id="viewWalletId" placeholder="Wallet ID" />
+    <button onclick="viewWallet()">View</button>
+    <pre id="viewResult"></pre>
+</section>
+
+<script>
+    const API_BASE = "http://127.0.0.1:8000";
+
+    async function createWallet() {
+        const res = await fetch(`${API_BASE}/wallets`, { method: "POST" });
+        const data = await res.json();
+        document.getElementById("walletResult").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function deposit() {
+        const body = {
+            wallet_id: document.getElementById("depositWalletId").value,
+            currency: document.getElementById("depositCurrency").value,
+            amount: Number(document.getElementById("depositAmount").value)
+        };
+
+        const res = await fetch(`${API_BASE}/deposit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        document.getElementById("depositResult").textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function swap() {
+        const body = {
+            wallet_id: document.getElementById("swapWalletId").value,
+            from_currency: document.getElementById("fromCurrency").value,
+            to_currency: document.getElementById("toCurrency").value,
+            amount: Number(document.getElementById("swapAmount").value)
+        };
+
+        const res = await fetch(`${API_BASE}/swap`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        document.getElementById("swapResult").textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function viewWallet() {
+        const walletId = document.getElementById("viewWalletId").value;
+        const res = await fetch(`${API_BASE}/wallet/${walletId}`);
+        document.getElementById("viewResult").textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+</script>
+
+
+</body>
+</html>
