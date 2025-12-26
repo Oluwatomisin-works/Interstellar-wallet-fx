@@ -1,6 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 import uuid
 import time
 
@@ -20,6 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#Validation Error Handler
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"error": "Invalid input. Amount must be a numeric value"},
+    )
+
 # --------------------
 # In-memory storage (prototype)
 # --------------------
@@ -32,7 +44,7 @@ transactions = []
 class DepositRequest(BaseModel):
     wallet_id: str
     currency: str
-    amount: float
+    amount: float = Field(..., gt=0)
 
 class SwapRequest(BaseModel):
     wallet_id: str
