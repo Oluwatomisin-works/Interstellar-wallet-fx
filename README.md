@@ -10,7 +10,7 @@ This project is a full-stack wallet and FX system built for Interstellar Solutio
 ## Tech Stack
 - Backend: FastAPI (Python)
 - Frontend: HTML + JavaScript
-- Storage: In-memory (no database)
+- Storage: SQLAlchemy
 
 ## Supported Currencies
 - USDx (mock USD)
