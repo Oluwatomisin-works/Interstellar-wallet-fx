@@ -1,50 +1,47 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from pydantic import BaseModel, Field
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
 import uuid
-import time
 
-app = FastAPI(title="Operation Borderless API")
+app = FastAPI()
 
-# --------------------
-# CORS (Frontend access)
-# --------------------
-app.add_middleware( 
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000"
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-#Validation Error Handler
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=400,
-        content={"error": "Invalid input. Amount must be a numeric value"},
-    )
-
 # --------------------
-# In-memory storage (prototype)
+# IN-MEMORY STORAGE
 # --------------------
 wallets = {}
 transactions = []
 
+SUPPORTED = {"USDx", "EURx", "cNGN", "cXAF"}
+
+FX_RATES = {
+    ("USDx", "cNGN"): 1495.0,
+    ("cNGN", "USDx"): 1 / 1495.0,
+    ("USDx", "EURx"): 0.84,
+    ("EURx", "USDx"): 1 / 0.84,
+    ("EURx", "cNGN"): 1779.1,
+    ("cNGN", "EURx"): 1 / 1779.1,
+    ("USDx", "cXAF"): 559.8,
+    ("cXAF", "USDx"): 1 / 559.8,
+    ("cNGN", "cXAF"): 1 / 2.59,
+    ("cXAF", "cNGN"): 2.59,
+    ("EURx", "cXAF"): 655.96,
+    ("cXAF", "EURx"): 1 / 655.96,
+}
+
 # --------------------
-# Models
+# SCHEMAS
 # --------------------
 class DepositRequest(BaseModel):
     wallet_id: str
     currency: str
-    amount: float = Field(..., gt=0)
+    amount: float
 
 class SwapRequest(BaseModel):
     wallet_id: str
@@ -59,108 +56,111 @@ class TransferRequest(BaseModel):
     amount: float
 
 # --------------------
-# Mock FX rates
+# HELPERS
 # --------------------
-FX_RATES = {
-    ("USDx", "cNGN"): 1495.0,
-    ("cNGN", "USDx"): 1/1495.0,
-    ("USDx", "EURx"): 0.84,
-    ("EURx", "USDx"): 1/0.84,
-    ("EURx", "cNGN"): 1779.1,
-    ("cNGN", "EURx"): 1/1779.1,
-}
+def validate_amount(amount):
+    if not isinstance(amount, (int, float)):
+        raise HTTPException(400, "Amount must be numeric")
+    if amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+
+def validate_currency(currency):
+    if currency not in SUPPORTED:
+        raise HTTPException(400, f"Unsupported currency: {currency}")
 
 # --------------------
-# Routes
+# ROUTES
 # --------------------
 @app.post("/wallets")
 def create_wallet():
     wallet_id = str(uuid.uuid4())
-    wallets[wallet_id] = {"balances": {}}
+    wallets[wallet_id] = {}
     return {"wallet_id": wallet_id}
 
 @app.get("/wallets/{wallet_id}")
 def get_wallet(wallet_id: str):
     if wallet_id not in wallets:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    return wallets[wallet_id]
+        raise HTTPException(404, "Wallet not found")
+    return {"wallet_id": wallet_id, "balances": wallets[wallet_id]}
 
 @app.post("/deposit")
 def deposit(req: DepositRequest):
+    validate_amount(req.amount)
+    validate_currency(req.currency)
+
     if req.wallet_id not in wallets:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    
-    if req.amount <= 0:
-        raise HTTPException(status_code=400, detail="Invalid amount")
-    
-    balances = wallets[req.wallet_id]["balances"]
-    balances[req.currency] = balances.get(req.currency, 0) + req.amount
-    
+        raise HTTPException(404, "Wallet not found")
+
+    wallets[req.wallet_id][req.currency] = (
+        wallets[req.wallet_id].get(req.currency, 0) + req.amount
+    )
+
     transactions.append({
+        "wallet_id": req.wallet_id,
         "type": "deposit",
-        "wallet": req.wallet_id,
         "currency": req.currency,
-        "amount": req.amount,
-        "timestamp": time.time()
-        
+        "amount": req.amount
     })
-    
-    return {"balances": balances}
+
+    return {"status": "success"}
 
 @app.post("/swap")
 def swap(req: SwapRequest):
+    validate_amount(req.amount)
+    validate_currency(req.from_currency)
+    validate_currency(req.to_currency)
+
     if req.wallet_id not in wallets:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    
-    balances = wallets[req.wallet_id]["balances"]
-    
-    if balances.get(req.from_currency, 0) < req.amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds")
-    
+        raise HTTPException(404, "Wallet not found")
+
     rate = FX_RATES.get((req.from_currency, req.to_currency))
     if not rate:
-        raise HTTPException(status_code=400, detail="FX rate unavailable")
-    
-    balances[req.from_currency] -= req.amount
-    balances[req.to_currency] = balances.get(req.to_currency, 0) + req.amount * rate
-    
+        raise HTTPException(400, "FX rate unavailable")
+
+    balance = wallets[req.wallet_id].get(req.from_currency, 0)
+    if balance < req.amount:
+        raise HTTPException(400, "Insufficient balance")
+
+    wallets[req.wallet_id][req.from_currency] -= req.amount
+    wallets[req.wallet_id][req.to_currency] = (
+        wallets[req.wallet_id].get(req.to_currency, 0) + req.amount * rate
+    )
+
     transactions.append({
+        "wallet_id": req.wallet_id,
         "type": "swap",
-        "wallet": req.wallet_id,
-        "from": req.from_currency,
-        "to": req.to_currency,
-        "amount": req.amount,
-        "rate": rate,
-        "timestamp": time.time()
+        "currency": f"{req.from_currency}->{req.to_currency}",
+        "amount": req.amount
     })
-    
-    return {"balances": balances}
+
+    return {"status": "success"}
 
 @app.post("/transfer")
 def transfer(req: TransferRequest):
-    if req.from_wallet not in wallets or req.to_wallet not in wallets:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    
-    from_bal = wallets[req.from_wallet]["balances"]
-    to_bal = wallets[req.to_wallet]["balances"]
-    
-    if from_bal.get(req.currency, 0) < req.amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds")
-    
-    from_bal[req.currency] -= req.amount
-    to_bal[req.currency] = to_bal.get(req.currency, 0) + req.amount
-    
-    transactions.append({
-        "type": "transfer",
-        "from": req.from_wallet,
-        "to": req.to_wallet,
-        "currency": req.currency,
-        "amount": req.amount,
-        "timestamp": time.time()
-    })
-    
-    return {"status": "ok"}
+    validate_amount(req.amount)
+    validate_currency(req.currency)
 
-@app.get("/transactions")
-def get_transactions():
-    return transactions
+    if req.from_wallet not in wallets or req.to_wallet not in wallets:
+        raise HTTPException(404, "Wallet not found")
+
+    balance = wallets[req.from_wallet].get(req.currency, 0)
+    if balance < req.amount:
+        raise HTTPException(400, "Insufficient balance")
+
+    wallets[req.from_wallet][req.currency] -= req.amount
+    wallets[req.to_wallet][req.currency] = (
+        wallets[req.to_wallet].get(req.currency, 0) + req.amount
+    )
+
+    transactions.append({
+        "wallet_id": req.from_wallet,
+        "type": "transfer",
+        "currency": req.currency,
+        "amount": req.amount
+    })
+
+    return {"status": "success"}
+
+@app.get("/transactions/{wallet_id}")
+def get_transactions(wallet_id: str):
+    return [t for t in transactions if t["wallet_id"] == wallet_id]
