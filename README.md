@@ -1,29 +1,42 @@
-This project is a full-stack wallet and FX system built for Interstellar Solutions.
+# Interstellar Wallet FX
 
-## Features
-- Wallet creation
-- Deposit mock stablecoins
-- Swap currencies using FX rates
-- Transfer between wallets
-- Minimal frontend demo
+## Overview
+A full-stack borderless wallet system supporting deposits, swaps, transfers, and FX conversion.
+
+This project was built as a technical assessment and demonstrates backend API design,
+frontend integration, validation, persistence, and deployment readiness.
 
 ## Tech Stack
 - Backend: FastAPI (Python)
-- Frontend: HTML + JavaScript
+- Frontend: React
 - Storage: In-memory
+- Deployment: Code Sandbox
 
-## Supported Currencies
-- USDx (mock USD)
-- EURx (mock EUR)
-- cNGN (mock NGN)
-- cXAF (mock CFA)
+## Features
+- Wallet creation
+- Deposit funds
+- Currency swap (mock FX)
+- Wallet-to-wallet transfer
+- Transaction validation
+- Persistent balances
+- REST API documentation
 
-## FX Rates
-FX rates are mocked to keep behaviour deterministic and testable.
+## How to Run Locally
 
-## Running the Backend
+### Backend
 ```bash
+cd backend
 python -m venv venv
+<<<<<<< HEAD
 venv\Scripts\Activate
 pip install fastapi uvicorn
 python -m uvicorn main:app --reload
+=======
+venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn main:app --reload
+
+
+## Project Named
+InterPockt
+>>>>>>> 33d80b2 (Finalize frontend and README updates)
